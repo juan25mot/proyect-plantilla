@@ -77,7 +77,6 @@ export function EditarPacienteModal({
         subsidiado: form.subsidiado,
         contributivo: form.contributivo,
       })
-      // El trigger calcular_hta_dm recalcula hta/dm automaticamente al guardar
       .eq('id', form.id)
       .select()
       .single()
@@ -94,137 +93,141 @@ export function EditarPacienteModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Editar paciente</DialogTitle>
-        </DialogHeader>
+      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+          <DialogContent className="max-w-2xl rounded-2xl border-slate-200">
+              <DialogHeader className="border-b border-slate-100 pb-2">
+                  <DialogTitle className="text-xl font-bold text-slate-800">
+                      Editar Paciente
+                  </DialogTitle>
+              </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
-          <div className="space-y-1">
-            <Label>Primer nombre</Label>
-            <Input value={form.primer_nombre} onChange={campo('primer_nombre')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Segundo nombre</Label>
-            <Input value={form.segundo_nombre ?? ''} onChange={campo('segundo_nombre')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Primer apellido</Label>
-            <Input value={form.primer_apellido} onChange={campo('primer_apellido')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Segundo apellido</Label>
-            <Input value={form.segundo_apellido ?? ''} onChange={campo('segundo_apellido')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Tipo ID</Label>
-            <Input value={form.tipo_documento} onChange={campo('tipo_documento')} />
-          </div>
-          <div className="space-y-1">
-            <Label>N de ID</Label>
-            <Input value={form.documento} onChange={campo('documento')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Fecha nacimiento</Label>
-            <Input
-              type="date"
-              value={form.fecha_nacimiento ?? ''}
-              onChange={campo('fecha_nacimiento')}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Sexo</Label>
-            <select
-              value={form.sexo ?? ''}
-              onChange={(e) =>
-                setForm({ ...form, sexo: e.target.value as 'F' | 'M' })
-              }
-              className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm h-9"
-            >
-              <option value="">-</option>
-              <option value="F">F</option>
-              <option value="M">M</option>
-            </select>
-          </div>
+              {/* Formulario en 2 columnas con tipografía text-sm más legible */}
+              <div className="grid grid-cols-2 gap-3 py-2">
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Primer nombre</Label>
+                      <Input className="h-9 text-sm" value={form.primer_nombre} onChange={campo('primer_nombre')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Segundo nombre</Label>
+                      <Input className="h-9 text-sm" value={form.segundo_nombre ?? ''} onChange={campo('segundo_nombre')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Primer apellido</Label>
+                      <Input className="h-9 text-sm" value={form.primer_apellido} onChange={campo('primer_apellido')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Segundo apellido</Label>
+                      <Input className="h-9 text-sm" value={form.segundo_apellido ?? ''} onChange={campo('segundo_apellido')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Tipo ID</Label>
+                      <Input className="h-9 text-sm" value={form.tipo_documento} onChange={campo('tipo_documento')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">N° de ID</Label>
+                      <Input className="h-9 text-sm" value={form.documento} onChange={campo('documento')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Fecha nacimiento</Label>
+                      <Input
+                          type="date"
+                          className="h-9 text-sm text-slate-800"
+                          value={form.fecha_nacimiento ?? ''}
+                          onChange={campo('fecha_nacimiento')}
+                      />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Sexo</Label>
+                      <select
+                          value={form.sexo ?? ''}
+                          onChange={(e) =>
+                              setForm({ ...form, sexo: e.target.value as 'F' | 'M' })
+                          }
+                          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm h-9 text-slate-800 bg-white"
+                      >
+                          <option value="">-</option>
+                          <option value="F">Femenino (F)</option>
+                          <option value="M">Masculino (M)</option>
+                      </select>
+                  </div>
 
-          <div className="col-span-2 space-y-1">
-            <Label>Diagnostico</Label>
-            <select
-              value={form.diagnostico_id}
-              onChange={(e) => setForm({ ...form, diagnostico_id: e.target.value })}
-              className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm h-9"
-            >
-              {diagnosticos.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.descripcion}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-slate-400">
-              HTA y DM se recalculan automaticamente segun el diagnostico elegido.
-            </p>
-          </div>
+                  <div className="col-span-2 space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Diagnóstico</Label>
+                      <select
+                          value={form.diagnostico_id}
+                          onChange={(e) => setForm({ ...form, diagnostico_id: e.target.value })}
+                          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm h-9 text-slate-800 bg-white"
+                      >
+                          {diagnosticos.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                  {d.descripcion}
+                              </option>
+                          ))}
+                      </select>
+                      <p className="text-xs text-slate-400">
+                          HTA y DM se recalculan automáticamente según el diagnóstico elegido.
+                      </p>
+                  </div>
 
-          <div className="col-span-2">
-            <Label>Direccion</Label>
-            <Input value={form.direccion ?? ''} onChange={campo('direccion')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Departamento</Label>
-            <Input value={form.departamento ?? ''} onChange={campo('departamento')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Municipio</Label>
-            <Input value={form.municipio ?? ''} onChange={campo('municipio')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Telefono</Label>
-            <Input value={form.telefono ?? ''} onChange={campo('telefono')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Telefono 2</Label>
-            <Input value={form.telefono2 ?? ''} onChange={campo('telefono2')} />
-          </div>
+                  <div className="col-span-2 space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Dirección</Label>
+                      <Input className="h-9 text-sm" value={form.direccion ?? ''} onChange={campo('direccion')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Departamento</Label>
+                      <Input className="h-9 text-sm" value={form.departamento ?? ''} onChange={campo('departamento')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Municipio</Label>
+                      <Input className="h-9 text-sm" value={form.municipio ?? ''} onChange={campo('municipio')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Teléfono</Label>
+                      <Input className="h-9 text-sm" value={form.telefono ?? ''} onChange={campo('telefono')} />
+                  </div>
+                  <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-slate-700">Teléfono 2</Label>
+                      <Input className="h-9 text-sm" value={form.telefono2 ?? ''} onChange={campo('telefono2')} />
+                  </div>
 
-          <div className="col-span-2 flex gap-6 pt-1">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={form.subsidiado}
-                onCheckedChange={(v) =>
-                  setForm({ ...form, subsidiado: Boolean(v) })
-                }
-              />
-              Subsidiado
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={form.contributivo}
-                onCheckedChange={(v) =>
-                  setForm({ ...form, contributivo: Boolean(v) })
-                }
-              />
-              Contributivo
-            </label>
-          </div>
-        </div>
+                  <div className="col-span-2 flex gap-6 pt-1">
+                      <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                          <Checkbox
+                              checked={form.subsidiado}
+                              onCheckedChange={(v) =>
+                                  setForm({ ...form, subsidiado: Boolean(v), contributivo: v ? false : form.contributivo })
+                              }
+                          />
+                          Subsidiado
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                          <Checkbox
+                              checked={form.contributivo}
+                              onCheckedChange={(v) =>
+                                  setForm({ ...form, contributivo: Boolean(v), subsidiado: v ? false : form.subsidiado })
+                              }
+                          />
+                          Contributivo
+                      </label>
+                  </div>
+              </div>
 
-        {error && <p className="text-sm text-[#dc2626]">{error}</p>}
+              {error && <p className="text-sm text-[#dc2626] font-semibold">{error}</p>}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={guardando}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={guardar}
-            disabled={guardando}
-            className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
-          >
-            {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Guardar cambios
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <DialogFooter className="border-t border-slate-100 pt-2">
+                  <Button variant="outline" onClick={onClose} disabled={guardando} className="text-sm">
+                      Cancelar
+                  </Button>
+                  <Button
+                      onClick={guardar}
+                      disabled={guardando}
+                      className="bg-[#dc2626] hover:bg-[#b91c1c] text-white text-sm font-semibold"
+                  >
+                      {guardando && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+                      Guardar cambios
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
   )
 }

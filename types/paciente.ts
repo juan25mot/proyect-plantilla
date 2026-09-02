@@ -24,6 +24,7 @@ export interface Paciente {
   contributivo: boolean
   hta: boolean
   dm: boolean
+  observacion: string | null
 }
 
 export interface PacienteSeleccionado extends Paciente {
