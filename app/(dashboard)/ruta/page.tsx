@@ -21,10 +21,13 @@ export default async function RutaPage() {
   // Transportista ve su propia ruta; auxiliar ve la ruta donde lo asignaron como auxiliar
   const columnaFiltro = rol === 'transportista' ? 'transportista_id' : 'auxiliar_id'
 
+  const hoy = new Date().toISOString().split('T')[0]
+
   const { data: plantilla } = await supabase
     .from('plantillas_generadas')
     .select('id, nombre_hoja')
     .eq(columnaFiltro, user!.id)
+    .eq('fecha_ruta', hoy)
     .eq('estado', 'en_progreso')
     .maybeSingle()
 

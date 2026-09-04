@@ -24,9 +24,15 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { auxiliar_id, transportista_id, pacientes } = body
+    const { auxiliar_id, transportista_id, fecha_ruta, pacientes } = body
 
-    if (!auxiliar_id || !transportista_id || !Array.isArray(pacientes) || pacientes.length === 0) {
+    if (
+        !auxiliar_id ||
+        !transportista_id ||
+        !fecha_ruta ||
+        !Array.isArray(pacientes) ||
+        pacientes.length === 0
+    ) {
         return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
     }
 
@@ -39,21 +45,18 @@ export async function POST(request: Request) {
     const transportistaNombre = usuarios?.find((u) => u.id === transportista_id)?.nombre ?? ''
 
     // Un transportista no puede tener dos rutas el mismo dia
-    const inicioHoy = new Date()
-    inicioHoy.setHours(0, 0, 0, 0)
-
-    const { data: rutasHoy } = await supabase
+    // (independiente del dia en que se generen)
+    const { data: rutasMismoDia } = await supabase
         .from('plantillas_generadas')
         .select('id, nombre_hoja')
         .eq('transportista_id', transportista_id)
-        .gte('fecha_generacion', inicioHoy.toISOString())
-        .order('fecha_generacion', { ascending: false })
+        .eq('fecha_ruta', fecha_ruta)
         .limit(1)
 
-    if (rutasHoy && rutasHoy.length > 0) {
+    if (rutasMismoDia && rutasMismoDia.length > 0) {
         return NextResponse.json(
             {
-                error: `Este transportista ya tiene una ruta asignada hoy ("${rutasHoy[0].nombre_hoja}"). Compléta o elimina esa primero antes de generar una nueva.`,
+                error: `Este transportista ya tiene una ruta asignada para el ${fecha_ruta} ("${rutasMismoDia[0].nombre_hoja}"). Complétala o elimínala antes de generar otra para ese día.`,
             },
             { status: 409 }
         )
@@ -69,10 +72,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'No se pudieron leer los pacientes' }, { status: 500 })
     }
 
-    const nombreHoja = `${transportistaNombre} - ${new Date().toLocaleDateString('es-CO', {
-        day: '2-digit',
-        month: 'short',
-    })}`
+    const nombreHoja = `${transportistaNombre} - ${new Date(
+        `${fecha_ruta}T00:00:00`
+    ).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}`
 
     // 1. Se crea como 'borrador' - si algo falla despues, esto ya quedo guardado
     const { data: plantilla, error: errorPlantilla } = await supabase
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
             auxiliar_nombre: auxiliarNombre,
             transportista_id,
             transportista_nombre: transportistaNombre,
+            fecha_ruta,
             generado_por: user.id,
             nombre_hoja: nombreHoja,
             estado: 'borrador',

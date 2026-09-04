@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { BuscadorPacientes } from '@/components/generador/BuscadorPacientes'
 import { TablaSeleccionados } from '@/components/generador/TablaSeleccionados'
 import { Button } from '@/components/ui/button'
-import { FileSpreadsheet, Loader2, UserCheck, Truck } from 'lucide-react'
+import { FileSpreadsheet, Loader2, UserCheck, Truck, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { EditarPacienteModal } from '@/components/generador/EditarPacienteModal'
 import type { Paciente, PacienteSeleccionado } from '@/types/paciente'
@@ -30,6 +30,21 @@ export default function GeneradorPage() {
   const [generando, setGenerando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pacienteEnEdicion, setPacienteEnEdicion] = useState<Paciente | null>(null)
+  const [fechaRuta, setFechaRuta] = useState(new Date().toISOString().split('T')[0])
+
+  // Estado para controlar la notificación flotante informativa
+  const [bloqueoPaciente, setBloqueoPaciente] = useState<{
+    paciente: Paciente
+    nombresRutas: string
+  } | null>(null)
+
+  // Helper para mostrar errores temporales en pantalla (5 segundos)
+  const mostrarErrorTemporal = (mensaje: string) => {
+    setError(mensaje)
+    setTimeout(() => {
+      setError(null)
+    }, 4000)
+  }
 
   useEffect(() => {
     const cargarDatosIniciales = async () => {
@@ -68,15 +83,40 @@ export default function GeneradorPage() {
     cargarDatosIniciales()
   }, [supabase])
 
-  const agregarPaciente = (p: Paciente) => {
-    if (seleccionados.length >= maxPacientes) {
-      setError(`No puedes agregar más de ${maxPacientes} pacientes por plantilla.`)
-      return
-    }
+  const agregarPacienteDirecto = (p: Paciente) => {
     setSeleccionados((prev) => [
       ...prev,
       { ...p, observaciones_jornada: p.observacion ?? '', resultados_enviados: '' },
     ])
+  }
+
+  const agregarPaciente = async (p: Paciente) => {
+    if (seleccionados.length >= maxPacientes) {
+      mostrarErrorTemporal(`No puedes agregar más de ${maxPacientes} pacientes por plantilla.`)
+      return
+    }
+
+    if (seleccionados.some((s) => s.id === p.id)) return
+
+    // Verifica si el paciente ya esta agendado en OTRA ruta para el mismo dia
+    const { data: otrasRutas } = await supabase
+      .from('plantilla_pacientes')
+      .select('plantillas_generadas!inner(nombre_hoja, fecha_ruta)')
+      .eq('paciente_id', p.id)
+      .eq('plantillas_generadas.fecha_ruta', fechaRuta)
+
+    if (otrasRutas && otrasRutas.length > 0) {
+      const nombresRutas = otrasRutas
+        .map((r: any) => r.plantillas_generadas?.nombre_hoja)
+        .filter(Boolean)
+        .join(', ')
+
+      // Muestra la alerta de bloqueo sin agregar al paciente
+      setBloqueoPaciente({ paciente: p, nombresRutas })
+      return
+    }
+
+    agregarPacienteDirecto(p)
   }
 
   const quitarPaciente = (id: string) => {
@@ -85,7 +125,7 @@ export default function GeneradorPage() {
 
   const cambiarCampo = (
     id: string,
-    campo: 'observaciones_jornada' | 'resultados_enviados',
+    campo: 'observaciones_jornada' | 'resultados_enviados' | 'direccion',
     valor: string
   ) => {
     setSeleccionados((prev) =>
@@ -103,11 +143,11 @@ export default function GeneradorPage() {
     setError(null)
 
     if (seleccionados.length === 0) {
-      setError('Agrega al menos un paciente antes de generar.')
+      mostrarErrorTemporal('Agrega al menos un paciente antes de generar.')
       return
     }
     if (!auxiliarId || !transportistaId) {
-      setError('Selecciona auxiliar y transportista.')
+      mostrarErrorTemporal('Selecciona auxiliar y transportista.')
       return
     }
 
@@ -120,6 +160,7 @@ export default function GeneradorPage() {
         body: JSON.stringify({
           auxiliar_id: auxiliarId,
           transportista_id: transportistaId,
+          fecha_ruta: fechaRuta,
           pacientes: seleccionados.map((p, i) => ({
             paciente_id: p.id,
             orden: i + 1,
@@ -141,14 +182,51 @@ export default function GeneradorPage() {
       const { plantillaId } = await res.json()
       router.push(`/historial?destacar=${plantillaId}`)
     } catch (e: any) {
-      setError(e.message ?? 'Ocurrió un error inesperado.')
+      mostrarErrorTemporal(e.message ?? 'Ocurrió un error inesperado.')
     } finally {
       setGenerando(false)
     }
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-[1700px] mx-auto relative">
+      {/* Capa de bloqueo e Interfaz de Alerta Informativa */}
+      {bloqueoPaciente && (
+        <>
+          <div className="fixed inset-0 z-40 bg-transparent cursor-not-allowed" />
+
+          <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl px-4 animate-in fade-in slide-in-from-top-4 duration-200">
+            <div className="bg-amber-50 border border-amber-300 rounded-xl shadow-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 text-amber-700 shrink-0 mt-0.5 sm:mt-0">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-amber-800">
+                    Paciente ya agendado hoy
+                  </h4>
+                  <p className="text-xs text-amber-900 leading-snug">
+                    Este paciente no se puede agregar porque ya está registrado en la ruta{' '}
+                    <span className="font-semibold">&quot;{bloqueoPaciente.nombresRutas}&quot;</span> para el día{' '}
+                    <span className="font-semibold">{fechaRuta}</span>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setBloqueoPaciente(null)}
+                  className="px-4 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Encabezado */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-800">
@@ -177,7 +255,19 @@ export default function GeneradorPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-600 block">
+                Fecha de la ruta
+              </label>
+              <input
+                type="date"
+                value={fechaRuta}
+                onChange={(e) => setFechaRuta(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#dc2626] focus:border-transparent transition-all h-10"
+              />
+            </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                 <UserCheck className="h-3.5 w-3.5 text-[#dc2626]" />
@@ -241,7 +331,7 @@ export default function GeneradorPage() {
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-center">
+        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-center animate-in fade-in duration-200">
           <p className="text-xs font-semibold text-red-600">{error}</p>
         </div>
       )}

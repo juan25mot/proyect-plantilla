@@ -29,7 +29,7 @@ function Fila({
   puedeEditar: boolean
   onCambiarCampo: (
     id: string,
-    campo: 'observaciones_jornada' | 'resultados_enviados',
+    campo: 'observaciones_jornada' | 'resultados_enviados' | 'direccion',
     valor: string
   ) => void
   onEditar: (paciente: PacienteSeleccionado) => void
@@ -71,6 +71,13 @@ function Fila({
       </td>
       <td className="p-3 text-xs text-slate-500 whitespace-nowrap">
         {telefonos || '-'}
+      </td>
+      <td className="p-2">
+        <input
+          value={paciente.direccion ?? ''}
+          onChange={(e) => onCambiarCampo(paciente.id, 'direccion', e.target.value)}
+          className="w-40 text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#dc2626] focus:border-transparent transition-all"
+        />
       </td>
       <td className="p-3 text-center">
         {paciente.subsidiado && (
@@ -151,7 +158,7 @@ export function TablaSeleccionados({
   onReordenar: (nuevos: PacienteSeleccionado[]) => void
   onCambiarCampo: (
     id: string,
-    campo: 'observaciones_jornada' | 'resultados_enviados',
+    campo: 'observaciones_jornada' | 'resultados_enviados' | 'direccion',
     valor: string
   ) => void
   onEditar: (paciente: PacienteSeleccionado) => void
@@ -190,6 +197,7 @@ export function TablaSeleccionados({
               <th className="p-3">Paciente</th>
               <th className="p-3">Documento</th>
               <th className="p-3">Teléfono</th>
+              <th className="p-2">Direccion</th>
               <th className="p-3 text-center">Sub.</th>
               <th className="p-3 text-center">Cont.</th>
               <th className="p-3 text-center">HTA</th>

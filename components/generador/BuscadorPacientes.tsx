@@ -14,7 +14,7 @@ export function BuscadorPacientes({
 }: {
   rol: string
   yaSeleccionados: string[]
-  onAgregar: (paciente: Paciente) => void
+  onAgregar: (paciente: Paciente) => void | Promise<void>
 }) {
   const supabase = createClient()
   const [query, setQuery] = useState('')
@@ -73,7 +73,7 @@ export function BuscadorPacientes({
           placeholder="Buscar por nombre, apellido o documento..."
           className="pl-10 pr-10 h-11 border-slate-200 focus-visible:ring-[#dc2626] rounded-xl text-slate-800 shadow-sm transition-all"
         />
-        
+
         {/* Botón para limpiar búsqueda con 'X' o indicador de carga */}
         {buscando ? (
           <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 animate-spin" />
@@ -150,11 +150,10 @@ export function BuscadorPacientes({
 
                   {/* Botón resaltado en Verde Esmeralda */}
                   <span
-                    className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-all ${
-                      yaAgregado
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-all ${yaAgregado
                         ? 'bg-slate-100 text-slate-400 border-slate-200'
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600'
-                    }`}
+                      }`}
                   >
                     {yaAgregado ? (
                       <span className="flex items-center gap-1">
