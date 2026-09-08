@@ -6,13 +6,18 @@ export interface Diagnostico {
 export interface Paciente {
   id: string
   activo: boolean
+  ocupacion: string | null
   tipo_documento: string
   documento: string
   primer_nombre: string
   segundo_nombre: string | null
   primer_apellido: string
   segundo_apellido: string | null
+  tipo_paciente: string | null
   diagnostico_id: string
+  departamento_afiliacion: string | null
+  ciudad_afiliacion: string | null
+  sucursal: string | null
   fecha_nacimiento: string | null
   sexo: 'F' | 'M' | null
   telefono: string | null

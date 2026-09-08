@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { EditarPacienteModal } from '@/components/generador/EditarPacienteModal'
 import type { Paciente, PacienteSeleccionado } from '@/types/paciente'
 
+
 interface UsuarioOpcion {
   id: string
   nombre: string

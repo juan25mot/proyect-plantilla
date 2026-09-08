@@ -19,15 +19,16 @@ export default async function DashboardLayout({
   }
 
   const { data: perfil } = await supabase
-    .from('perfiles')
-    .select('nombre, rol')
-    .eq('id', user.id)
-    .single()
+  .from('perfiles')
+  .select('nombre, rol, activo')
+  .eq('id', user.id)
+  .single()
 
   // Si no tiene perfil o esta inactivo, no dejarlo entrar
-  if (!perfil) {
-    redirect('/login')
-  }
+  if (!perfil || !perfil.activo) {
+  await supabase.auth.signOut()
+  redirect('/login')
+}
 
   return (
     <div className="min-h-screen w-full bg-white flex">
