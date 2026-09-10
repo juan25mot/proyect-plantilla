@@ -81,7 +81,7 @@ export default function LoginPage() {
           </CardHeader>
 
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
               Correo Electrónico

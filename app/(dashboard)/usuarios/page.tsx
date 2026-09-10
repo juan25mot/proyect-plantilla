@@ -1,19 +1,10 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { ListaUsuarios } from '@/components/usuarios/ListaUsuarios'
+import { getPerfilActual } from '@/lib/auth/get-perfil'
 
 export default async function UsuariosPage() {
-  const supabase = await createClient()
+  const { user, perfil } = await getPerfilActual()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: perfil } = await supabase
-    .from('perfiles')
-    .select('rol')
-    .eq('id', user!.id)
-    .single()
 
   if (perfil?.rol !== 'admin') {
     redirect('/')

@@ -16,6 +16,7 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card'
+import { getPerfilActual } from '@/lib/auth/get-perfil'
 
 function formatRelativo(fecha: string) {
   const diffMs = Date.now() - new Date(fecha).getTime()
@@ -129,20 +130,13 @@ async function getStatsTransportista(supabase: any, userId: string) {
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  const { user, perfil } = await getPerfilActual()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: perfil } = await supabase
-    .from('perfiles')
-    .select('nombre, rol')
-    .eq('id', user!.id)
-    .single()
 
   const rol = perfil?.rol ?? 'auxiliar'
   const esGestor = rol === 'admin' || rol === 'operario'
+
+  const supabase = await createClient()
 
   return (
     <div className="space-y-6">

@@ -2,41 +2,31 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Navbar } from '@/components/layout/Navbar'
+import { getPerfilActual } from '@/lib/auth/get-perfil'
+import { PerfilProvider } from '@/lib/auth/PerfilContext'
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  const { user, perfil } = await getPerfilActual()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!user || !perfil || !perfil.activo) {
+    const supabase = await createClient()
+    await supabase.auth.signOut()
     redirect('/login')
   }
 
-  const { data: perfil } = await supabase
-  .from('perfiles')
-  .select('nombre, rol, activo')
-  .eq('id', user.id)
-  .single()
-
-  // Si no tiene perfil o esta inactivo, no dejarlo entrar
-  if (!perfil || !perfil.activo) {
-  await supabase.auth.signOut()
-  redirect('/login')
-}
-
   return (
-    <div className="min-h-screen w-full bg-white flex">
-      <Sidebar rol={perfil.rol} />
-      <div className="flex-1 flex flex-col">
-        <Navbar nombre={perfil.nombre} rol={perfil.rol} />
-        <main className="flex-1 p-6">{children}</main>
+    <PerfilProvider perfil={{ userId: user.id, nombre: perfil.nombre, rol: perfil.rol }}>
+      <div className="min-h-screen w-full bg-white flex">
+        <Sidebar rol={perfil.rol} />
+        <div className="flex-1 flex flex-col">
+          <Navbar nombre={perfil.nombre} rol={perfil.rol} />
+          <main className="flex-1 p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </PerfilProvider>
   )
 }

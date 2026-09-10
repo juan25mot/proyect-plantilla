@@ -1,19 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { RutaDelDia } from '@/components/ruta/RutaDelDia'
 import { Card, CardContent } from '@/components/ui/card'
+import { getPerfilActual } from '@/lib/auth/get-perfil'
 
 export default async function RutaPage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: perfil } = await supabase
-    .from('perfiles')
-    .select('rol')
-    .eq('id', user!.id)
-    .single()
+  const { user, perfil } = await getPerfilActual()
 
   const rol = perfil?.rol ?? ''
   const soloLectura = rol === 'auxiliar' || rol === 'admin'
@@ -22,6 +13,8 @@ export default async function RutaPage() {
   const columnaFiltro = rol === 'transportista' ? 'transportista_id' : 'auxiliar_id'
 
   const hoy = new Date().toISOString().split('T')[0]
+
+  const supabase = await createClient()
 
   const { data: plantilla } = await supabase
     .from('plantillas_generadas')

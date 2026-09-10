@@ -10,6 +10,7 @@ import { FileSpreadsheet, Loader2, UserCheck, Truck, AlertTriangle } from 'lucid
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { EditarPacienteModal } from '@/components/generador/EditarPacienteModal'
 import type { Paciente, PacienteSeleccionado } from '@/types/paciente'
+import { usePerfil } from '@/lib/auth/PerfilContext'
 
 
 interface UsuarioOpcion {
@@ -21,7 +22,7 @@ export default function GeneradorPage() {
   const supabase = createClient()
   const router = useRouter()
 
-  const [rol, setRol] = useState<string>('')
+  const { rol } = usePerfil()
   const [seleccionados, setSeleccionados] = useState<PacienteSeleccionado[]>([])
   const [auxiliares, setAuxiliares] = useState<UsuarioOpcion[]>([])
   const [transportistas, setTransportistas] = useState<UsuarioOpcion[]>([])
@@ -49,24 +50,11 @@ export default function GeneradorPage() {
 
   useEffect(() => {
     const cargarDatosIniciales = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
 
-      const [perfilRes, usuariosRes, configRes] = await Promise.all([
-        supabase.from('perfiles').select('rol').eq('id', user!.id).single(),
-        supabase
-          .from('perfiles')
-          .select('id, nombre, rol')
-          .eq('activo', true),
-        supabase
-          .from('configuracion')
-          .select('valor')
-          .eq('clave', 'max_pacientes_por_plantilla')
-          .single(),
+      const [usuariosRes, configRes] = await Promise.all([
+        supabase.from('perfiles').select('id, nombre, rol').eq('activo', true),
+        supabase.from('configuracion').select('valor').eq('clave', 'max_pacientes_por_plantilla').single(),
       ])
-
-      setRol(perfilRes.data?.rol ?? '')
 
       const usuarios = usuariosRes.data ?? []
       setAuxiliares(
@@ -167,6 +155,7 @@ export default function GeneradorPage() {
             orden: i + 1,
             observaciones_jornada: p.observaciones_jornada,
             resultados_enviados: p.resultados_enviados,
+            direccion: p.direccion ?? '',
           })),
         }),
       })

@@ -1,23 +1,16 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ConfiguracionForm } from '@/components/configuracion/ConfiguracionForm'
+import { getPerfilActual } from '@/lib/auth/get-perfil'
 
 export default async function ConfiguracionPage() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: perfil } = await supabase
-    .from('perfiles')
-    .select('rol')
-    .eq('id', user!.id)
-    .single()
+  const { user, perfil } = await getPerfilActual()
 
   if (perfil?.rol !== 'admin') {
     redirect('/')
   }
+
+  const supabase = await createClient()
 
   const { data: config } = await supabase
     .from('configuracion')

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { FilaPlantilla } from '@/components/historial/FilaPlantilla'
+import { getPerfilActual } from '@/lib/auth/get-perfil'
 
 export default async function HistorialPage({
   searchParams,
@@ -10,21 +11,13 @@ export default async function HistorialPage({
   const { borrador, destacar } = await searchParams
   const destacarId = borrador ?? destacar
 
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: perfil } = await supabase
-    .from('perfiles')
-    .select('rol')
-    .eq('id', user!.id)
-    .single()
-
+  const { user, perfil } = await getPerfilActual()
+  
   if (!perfil || !['admin', 'operario'].includes(perfil.rol)) {
     redirect('/')
   }
+
+  const supabase = await createClient()
 
   const { data: plantillas } = await supabase
     .from('plantillas_generadas')
