@@ -4,8 +4,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -31,9 +33,10 @@ export async function POST(
   }
 
   const admin = createAdminClient()
-  const { error } = await admin.auth.admin.updateUserById(params.id, { password })
+  const { error } = await admin.auth.admin.updateUserById(id, { password })
 
   if (error) {
+    console.error('Error reseteando contrasena:', error)
     return NextResponse.json({ error: 'No se pudo cambiar la contrasena' }, { status: 500 })
   }
 

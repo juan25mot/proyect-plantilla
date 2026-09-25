@@ -3,206 +3,201 @@ import { createClient } from '@/lib/supabase/server'
 import { crearPestanaPlantilla } from '@/lib/google-sheets/sheets-client'
 
 export async function POST(request: Request) {
-    const supabase = await createClient()
+  const supabase = await createClient()
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-    if (!user) {
-        return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+  if (!user) {
+    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  }
 
-    const { data: perfil } = await supabase
-        .from('perfiles')
-        .select('rol')
-        .eq('id', user.id)
-        .single()
+  const { data: perfil } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.id)
+    .single()
 
-    if (!perfil || !['admin', 'operario'].includes(perfil.rol)) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-    }
+  if (!perfil || !['admin', 'operario'].includes(perfil.rol)) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+  }
 
-    const body = await request.json()
-    const { auxiliar_id, transportista_id, fecha_ruta, pacientes } = body
+  const body = await request.json()
+  const { auxiliar_id, transportista_id, fecha_ruta, pacientes } = body
 
-    if (
-        !auxiliar_id ||
-        !transportista_id ||
-        !fecha_ruta ||
-        !Array.isArray(pacientes) ||
-        pacientes.length === 0
-    ) {
-        return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
-    }
+  if (
+    !auxiliar_id || !transportista_id || !fecha_ruta ||
+    !Array.isArray(pacientes) || pacientes.length === 0
+  ) {
+    return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
+  }
 
-    const { data: usuarios } = await supabase
-        .from('perfiles')
-        .select('id, nombre')
-        .in('id', [auxiliar_id, transportista_id])
+  const idsPacientes = pacientes.map((p: any) => p.paciente_id)
 
-    const auxiliarNombre = usuarios?.find((u) => u.id === auxiliar_id)?.nombre ?? ''
-    const transportistaNombre = usuarios?.find((u) => u.id === transportista_id)?.nombre ?? ''
+  // Antes esto eran 4 idas y vueltas seguidas a la base de datos.
+  // Ninguna depende de otra para EMPEZAR, asi que se disparan todas juntas.
+  const [usuariosRes, rutasMismoDiaRes, pacientesRes, configRes] = await Promise.all([
+    supabase.from('perfiles').select('id, nombre').in('id', [auxiliar_id, transportista_id]),
+    supabase
+      .from('plantillas_generadas')
+      .select('id, nombre_hoja')
+      .eq('transportista_id', transportista_id)
+      .eq('fecha_ruta', fecha_ruta)
+      .limit(1),
+    supabase.from('pacientes').select('*').in('id', idsPacientes),
+    supabase.from('configuracion').select('valor').eq('clave', 'google_sheets_file_id').single(),
+  ])
 
-    // Un transportista no puede tener dos rutas el mismo dia
-    // (independiente del dia en que se generen)
-    const { data: rutasMismoDia } = await supabase
-        .from('plantillas_generadas')
-        .select('id, nombre_hoja')
-        .eq('transportista_id', transportista_id)
-        .eq('fecha_ruta', fecha_ruta)
-        .limit(1)
+  if (rutasMismoDiaRes.data && rutasMismoDiaRes.data.length > 0) {
+    return NextResponse.json(
+      {
+        error: `Este transportista ya tiene una ruta asignada para el ${fecha_ruta} ("${rutasMismoDiaRes.data[0].nombre_hoja}"). Compléta o elimínala antes de generar otra para ese día.`,
+      },
+      { status: 409 }
+    )
+  }
 
-    if (rutasMismoDia && rutasMismoDia.length > 0) {
-        return NextResponse.json(
-            {
-                error: `Este transportista ya tiene una ruta asignada para el ${fecha_ruta} ("${rutasMismoDia[0].nombre_hoja}"). Complétala o elimínala antes de generar otra para ese día.`,
-            },
-            { status: 409 }
-        )
-    }
+  const datosPacientes = pacientesRes.data
+  if (pacientesRes.error || !datosPacientes) {
+    return NextResponse.json({ error: 'No se pudieron leer los pacientes' }, { status: 500 })
+  }
 
-    const idsPacientes = pacientes.map((p: any) => p.paciente_id)
-    const { data: datosPacientes, error: errorPacientes } = await supabase
-        .from('pacientes')
-        .select('*')
-        .in('id', idsPacientes)
+  const auxiliarNombre = usuariosRes.data?.find((u) => u.id === auxiliar_id)?.nombre ?? ''
+  const transportistaNombre = usuariosRes.data?.find((u) => u.id === transportista_id)?.nombre ?? ''
+  const spreadsheetId = configRes.data?.valor
 
-    if (errorPacientes || !datosPacientes) {
-        return NextResponse.json({ error: 'No se pudieron leer los pacientes' }, { status: 500 })
-    }
+  const nombreHoja = `${transportistaNombre} - ${new Date(
+    `${fecha_ruta}T00:00:00`
+  ).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}`
 
-    const nombreHoja = `${transportistaNombre} - ${new Date(
-        `${fecha_ruta}T00:00:00`
-    ).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}`
-
-    // 1. Se crea como 'borrador' - si algo falla despues, esto ya quedo guardado
-    const { data: plantilla, error: errorPlantilla } = await supabase
-        .from('plantillas_generadas')
-        .insert({
-            auxiliar_id,
-            auxiliar_nombre: auxiliarNombre,
-            transportista_id,
-            transportista_nombre: transportistaNombre,
-            fecha_ruta,
-            generado_por: user.id,
-            nombre_hoja: nombreHoja,
-            estado: 'borrador',
-        })
-        .select()
-        .single()
-
-    if (errorPlantilla || !plantilla) {
-        return NextResponse.json({ error: 'No se pudo crear la plantilla' }, { status: 500 })
-    }
-
-    const filas = pacientes.map((p: any) => {
-        const datos = datosPacientes.find((d) => d.id === p.paciente_id)
-        return {
-            plantilla_id: plantilla.id,
-            paciente_id: p.paciente_id,
-            orden: p.orden,
-            observaciones_jornada: p.observaciones_jornada ?? '',
-            resultados_enviados: p.resultados_enviados ?? '',
-            telefono_snapshot: [datos?.telefono, datos?.telefono2].filter(Boolean).join(' / '),
-        }
+  const { data: plantilla, error: errorPlantilla } = await supabase
+    .from('plantillas_generadas')
+    .insert({
+      auxiliar_id, auxiliar_nombre: auxiliarNombre,
+      transportista_id, transportista_nombre: transportistaNombre,
+      fecha_ruta, generado_por: user.id,
+      nombre_hoja: nombreHoja, estado: 'borrador',
     })
+    .select()
+    .single()
 
-    const { error: errorFilas } = await supabase.from('plantilla_pacientes').insert(filas)
+  if (errorPlantilla || !plantilla) {
+    return NextResponse.json({ error: 'No se pudo crear la plantilla' }, { status: 500 })
+  }
 
-    if (errorFilas) {
-        // Aqui si no queda nada util guardado (fallo antes de tener pacientes asociados) - se borra
-        await supabase.from('plantillas_generadas').delete().eq('id', plantilla.id)
-        return NextResponse.json(
-            { error: 'No se pudieron guardar los pacientes de la plantilla' },
-            { status: 500 }
-        )
+  const filas = pacientes.map((p: any) => {
+    const datos = datosPacientes.find((d) => d.id === p.paciente_id)
+    return {
+      plantilla_id: plantilla.id,
+      paciente_id: p.paciente_id,
+      orden: p.orden,
+      observaciones_jornada: p.observaciones_jornada ?? '',
+      resultados_enviados: p.resultados_enviados ?? '',
+      telefono_snapshot: [datos?.telefono, datos?.telefono2].filter(Boolean).join(' / '),
     }
+  })
 
-    // Actualiza la ficha del paciente con la observacion mas reciente de esta jornada.
-    // No borra la nota anterior si esta jornada se dejo en blanco - solo actualiza
-    // cuando hay contenido nuevo que escribir.
-    const actualizacionesObservacion = filas
-        .filter((f) => f.observaciones_jornada && f.observaciones_jornada.trim() !== '')
-        .map((f) =>
-            supabase
-                .from('pacientes')
-                .update({ observacion: f.observaciones_jornada })
-                .eq('id', f.paciente_id))
-    if (actualizacionesObservacion.length > 0) {
-        await Promise.all(actualizacionesObservacion)
-    }
+  const { error: errorFilas } = await supabase.from('plantilla_pacientes').insert(filas)
 
-    // 2. A partir de aqui, el "borrador" ya es recuperable pase lo que pase con Sheets
-    const resultado = await intentarGenerarSheets(supabase, plantilla.id, {
-        nombreHoja,
-        auxiliarNombre,
-        transportistaNombre,
-        filas,
-        datosPacientes,
+  if (errorFilas) {
+    await supabase.from('plantillas_generadas').delete().eq('id', plantilla.id)
+    return NextResponse.json(
+      { error: 'No se pudieron guardar los pacientes de la plantilla' },
+      { status: 500 }
+    )
+  }
+
+  // Antes eran DOS Promise.all separados (observacion, luego direccion).
+  // Se combinan en un solo update por paciente, con ambos campos si aplican.
+  const actualizacionesFicha = pacientes
+    .map((p: any) => {
+      const cambios: Record<string, string> = {}
+      if (p.observaciones_jornada?.trim()) cambios.observacion = p.observaciones_jornada
+      if (p.direccion?.trim()) cambios.direccion = p.direccion
+      return { id: p.paciente_id, cambios }
     })
+    .filter((c) => Object.keys(c.cambios).length > 0)
+    .map((c) => supabase.from('pacientes').update(c.cambios).eq('id', c.id))
 
-    if (!resultado.ok) {
-        return NextResponse.json(
-            {
-                plantillaId: plantilla.id,
-                borrador: true,
-                error:
-                    'No se pudo generar la hoja en Google Sheets. Tu seleccion quedo guardada como borrador — puedes reintentar sin perder nada.',
-            },
-            { status: 502 }
-        )
-    }
+  const direccionesEditadas = new Map(pacientes.map((p: any) => [p.paciente_id, p.direccion]))
+  const datosPacientesActualizados = datosPacientes.map((d) => ({
+    ...d,
+    direccion: direccionesEditadas.get(d.id)?.trim() || d.direccion,
+  }))
 
-    return NextResponse.json({ plantillaId: plantilla.id, sheetsUrl: resultado.sheetsUrl })
+  // Se lanza en paralelo con la generacion de Sheets - no hay que esperarla
+  // para poder seguir, ya que Sheets usa los datos ya actualizados en memoria.
+  const actualizacionFichaPromise = actualizacionesFicha.length > 0
+    ? Promise.all(actualizacionesFicha)
+    : Promise.resolve()
+
+  const [resultado] = await Promise.all([
+    intentarGenerarSheets(supabase, plantilla.id, spreadsheetId, {
+      nombreHoja, auxiliarNombre, transportistaNombre,
+      filas, datosPacientes: datosPacientesActualizados,
+    }),
+    actualizacionFichaPromise,
+  ])
+
+  if (!resultado.ok) {
+    return NextResponse.json(
+      {
+        plantillaId: plantilla.id,
+        borrador: true,
+        error: 'No se pudo generar la hoja en Google Sheets. Tu selección quedó guardada como borrador — puedes reintentar sin perder nada.',
+      },
+      { status: 502 }
+    )
+  }
+
+  return NextResponse.json({ plantillaId: plantilla.id, sheetsUrl: resultado.sheetsUrl })
 }
 
 async function intentarGenerarSheets(
-    supabase: any,
-    plantillaId: string,
-    datos: {
-        nombreHoja: string
-        auxiliarNombre: string
-        transportistaNombre: string
-        filas: any[]
-        datosPacientes: any[]
-    }
+  supabase: any,
+  plantillaId: string,
+  spreadsheetId: string | undefined,
+  datos: {
+    nombreHoja: string
+    auxiliarNombre: string
+    transportistaNombre: string
+    filas: any[]
+    datosPacientes: any[]
+  }
 ) {
-    const { data: configSheet } = await supabase
-        .from('configuracion')
-        .select('valor')
-        .eq('clave', 'google_sheets_file_id')
-        .single()
+  if (!spreadsheetId) return { ok: false }
 
-    const spreadsheetId = configSheet?.valor
-    if (!spreadsheetId) return { ok: false }
+  let resultadoSheets: { url: string; nombreHoja: string } | null = null
 
-    let sheetsUrl: string | null = null
-
-    for (let intento = 1; intento <= 2; intento++) {
-        try {
-            sheetsUrl = await crearPestanaPlantilla({
-                spreadsheetId,
-                nombreHoja: datos.nombreHoja,
-                auxiliarNombre: datos.auxiliarNombre,
-                transportistaNombre: datos.transportistaNombre,
-                pacientes: datos.filas.map((f) => ({
-                    ...datos.datosPacientes.find((d) => d.id === f.paciente_id),
-                    ...f,
-                })),
-            })
-            break
-        } catch (e) {
-            if (intento === 2) console.error('Error generando hoja de Google Sheets:', e)
-        }
+  for (let intento = 1; intento <= 2; intento++) {
+    try {
+      resultadoSheets = await crearPestanaPlantilla({
+        spreadsheetId,
+        nombreHoja: datos.nombreHoja,
+        auxiliarNombre: datos.auxiliarNombre,
+        transportistaNombre: datos.transportistaNombre,
+        pacientes: datos.filas.map((f) => ({
+          ...datos.datosPacientes.find((d) => d.id === f.paciente_id),
+          ...f,
+        })),
+      })
+      break
+    } catch (e) {
+      if (intento === 2) console.error('Error generando hoja de Google Sheets:', e)
     }
+  }
 
-    if (!sheetsUrl) return { ok: false }
+  if (!resultadoSheets) return { ok: false }
 
-    await supabase
-        .from('plantillas_generadas')
-        .update({ estado: 'en_progreso', google_sheets_url: sheetsUrl })
-        .eq('id', plantillaId)
+  await supabase
+    .from('plantillas_generadas')
+    .update({
+      estado: 'en_progreso',
+      google_sheets_url: resultadoSheets.url,
+      nombre_hoja: resultadoSheets.nombreHoja,
+    })
+    .eq('id', plantillaId)
 
-    return { ok: true, sheetsUrl }
+  return { ok: true, sheetsUrl: resultadoSheets.url }
 }

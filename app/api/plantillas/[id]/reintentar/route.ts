@@ -4,8 +4,10 @@ import { crearPestanaPlantilla } from '@/lib/google-sheets/sheets-client'
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
+
   const supabase = await createClient()
 
   const {
@@ -19,7 +21,7 @@ export async function POST(
   const { data: plantilla } = await supabase
     .from('plantillas_generadas')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('estado', 'borrador')
     .single()
 
@@ -51,7 +53,7 @@ export async function POST(
   }
 
   try {
-    const sheetsUrl = await crearPestanaPlantilla({
+    const resultadoSheets = await crearPestanaPlantilla({
       spreadsheetId,
       nombreHoja: plantilla.nombre_hoja,
       auxiliarNombre: plantilla.auxiliar_nombre,
@@ -63,11 +65,15 @@ export async function POST(
     })
 
     await supabase
-      .from('plantillas_generadas')
-      .update({ estado: 'en_progreso', google_sheets_url: sheetsUrl })
+      .from('plantillas_generadas') 
+      .update({
+        estado: 'en_progreso',
+        google_sheets_url: resultadoSheets.url,
+        nombre_hoja: resultadoSheets.nombreHoja,
+      })
       .eq('id', plantilla.id)
 
-    return NextResponse.json({ sheetsUrl })
+    return NextResponse.json({ sheetsUrl: resultadoSheets.url })
   } catch (e) {
     console.error('Error reintentando Sheets:', e)
     return NextResponse.json(
